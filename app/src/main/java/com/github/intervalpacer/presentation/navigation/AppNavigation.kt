@@ -25,6 +25,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.github.intervalpacer.domain.model.WorkoutState
+import kotlin.time.Duration.Companion.milliseconds
 import com.github.intervalpacer.presentation.home.HomeScreen
 import com.github.intervalpacer.presentation.history.HistoryDetailScreen
 import com.github.intervalpacer.presentation.history.HistoryScreen
@@ -35,6 +37,7 @@ import com.github.intervalpacer.presentation.interval.IntervalViewModel
 import com.github.intervalpacer.presentation.settraining.SetTrainingScreen
 import com.github.intervalpacer.presentation.settraining.SetTrainingViewModel
 import com.github.intervalpacer.presentation.settings.SettingsScreen
+import com.github.intervalpacer.presentation.settings.SettingsViewModel
 import com.github.intervalpacer.R
 
 /**
@@ -69,7 +72,8 @@ private val fullScreenRoutes = setOf(Screen.Interval.route, Screen.SetTraining.r
 fun AppNavigation(
     intervalViewModel: IntervalViewModel,
     setTrainingViewModel: SetTrainingViewModel,
-    historyViewModel: HistoryViewModel
+    historyViewModel: HistoryViewModel,
+    settingsViewModel: SettingsViewModel
 ) {
     val navController = rememberNavController()
     val bottomNavScreens = listOf(Screen.Home, Screen.History, Screen.Settings)
@@ -148,7 +152,7 @@ fun AppNavigation(
 
             // 设置
             composable(Screen.Settings.route) {
-                SettingsScreen()
+                SettingsScreen(viewModel = settingsViewModel)
             }
 
             // 间歇训练页面（全屏，无底部导航）
@@ -156,6 +160,11 @@ fun AppNavigation(
                 val timerState by intervalViewModel.timerState.collectAsState()
                 val currentPhase by intervalViewModel.currentPhase.collectAsState()
                 var config by remember { mutableStateOf(intervalViewModel.config) }
+
+                // 导航离开时重置状态，避免返回主页时闪过 IdleScreen
+                androidx.compose.runtime.DisposableEffect(Unit) {
+                    onDispose { intervalViewModel.resetToIdle() }
+                }
 
                 IntervalScreen(
                     timerState = timerState,
@@ -174,7 +183,16 @@ fun AppNavigation(
                     onSkip = { intervalViewModel.skipPhase() },
                     onResetToIdle = {
                         navController.popBackStack(Screen.Home.route, inclusive = false)
-                        intervalViewModel.resetToIdle()
+                    },
+                    elapsedDuration = if (intervalViewModel.startTime > 0L) {
+                        (System.currentTimeMillis() - intervalViewModel.startTime).milliseconds
+                    } else {
+                        kotlin.time.Duration.ZERO
+                    },
+                    completedRounds = (timerState as? WorkoutState.Active)?.completedRounds ?: 0,
+                    targetRounds = config.rounds,
+                    onDiscard = {
+                        navController.popBackStack(Screen.Home.route, inclusive = false)
                     }
                 )
             }

@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.intervalpacer.IntervalPacerApp
 import com.github.intervalpacer.core.tts.TTSManager
+import com.github.intervalpacer.data.local.SharedPreferencesManager
 import com.github.intervalpacer.core.tts.VoicePromptGenerator
 import com.github.intervalpacer.core.vibration.VibrationManager
 import com.github.intervalpacer.data.model.StrengthConfig
@@ -30,6 +31,7 @@ class IntervalViewModel(application: Application) : AndroidViewModel(application
     private val timerService = TimerService(viewModelScope)
     private val ttsManager = TTSManager(application)
     private val vibrationManager = VibrationManager(application)
+    private val prefsManager = SharedPreferencesManager(application)
     private val voicePromptGenerator = VoicePromptGenerator()
     private val historyRepository: HistoryRepository =
         (application as IntervalPacerApp).historyRepository
@@ -38,6 +40,7 @@ class IntervalViewModel(application: Application) : AndroidViewModel(application
     val currentPhase: StateFlow<Phase> = timerService.currentPhase
 
     private var trainingStartTime: Long = 0L
+    val startTime: Long get() = trainingStartTime
     private var currentIntervalConfig: IntervalConfig? = null
 
     // 默认配置：新手预设
@@ -52,6 +55,9 @@ class IntervalViewModel(application: Application) : AndroidViewModel(application
         private set
 
     init {
+        // 读取震动设置
+        vibrationManager.enabled = prefsManager.vibrationEnabled
+
         // 监听语音播报请求
         viewModelScope.launch {
             timerService.announcementFlow.collect { request ->
@@ -82,8 +88,8 @@ class IntervalViewModel(application: Application) : AndroidViewModel(application
                 runDuration = runDuration,
                 walkDuration = walkDuration,
                 repeatCount = config.rounds,
-                enableVoicePrompt = true,
-                enableVibration = true,
+                enableVoicePrompt = prefsManager.voiceEnabled,
+                enableVibration = prefsManager.vibrationEnabled,
                 runFirst = config.runFirst
             )
 

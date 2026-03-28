@@ -3,6 +3,7 @@ package com.github.intervalpacer.presentation.interval
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -60,8 +62,14 @@ fun IntervalScreen(
     onResume: () -> Unit,
     onStop: () -> Unit,
     onSkip: () -> Unit,
-    onResetToIdle: () -> Unit
+    onResetToIdle: () -> Unit,
+    elapsedDuration: kotlin.time.Duration = kotlin.time.Duration.ZERO,
+    completedRounds: Int = 0,
+    targetRounds: Int = 0,
+    onDiscard: () -> Unit = {}
 ) {
+    var showStopConfirmDialog by remember { mutableStateOf(false) }
+
     // 背景色动画过渡
     val backgroundColor by animateColorAsState(
         targetValue = getPhaseBackgroundColor(currentPhase),
@@ -91,14 +99,36 @@ fun IntervalScreen(
             )
             is WorkoutState.Paused -> PausedScreen(
                 onResume = onResume,
-                onStop = onStop
+                onStop = { showStopConfirmDialog = true }
             )
-            is WorkoutState.Completed -> CompletedScreen(
-                totalRounds = (timerState as? WorkoutState.Completed)?.completedRounds ?: 0,
-                totalDuration = (timerState as? WorkoutState.Completed)?.totalDuration ?: kotlin.time.Duration.ZERO,
-                onBackToHome = onResetToIdle
-            )
+            is WorkoutState.Completed -> {
+                val completedState = timerState as? WorkoutState.Completed
+                CompletedScreen(
+                    totalRounds = completedState?.completedRounds ?: 0,
+                    totalDuration = completedState?.totalDuration ?: kotlin.time.Duration.ZERO,
+                    isCompleted = completedState?.completedRounds ?: 0 >= targetRounds,
+                    onBackToHome = onResetToIdle
+                )
+            }
             else -> {}
+        }
+
+        // 提前结束确认弹窗
+        if (showStopConfirmDialog) {
+            StopConfirmDialog(
+                completedRounds = completedRounds,
+                targetRounds = targetRounds,
+                elapsedDuration = elapsedDuration,
+                onSave = {
+                    showStopConfirmDialog = false
+                    onStop()
+                },
+                onDiscard = {
+                    showStopConfirmDialog = false
+                    onDiscard()
+                },
+                onDismiss = { showStopConfirmDialog = false }
+            )
         }
     }
 }
@@ -124,41 +154,29 @@ fun ActiveScreen(
             .navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 顶部控制栏：暂停按钮 + 设置按钮
+        // 顶部控制栏：暂停按钮
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 暂停按钮（64x64dp 关键按钮）- 使用 surfaceContainerHighest 背景
-            IconButton(
-                onClick = onPause,
+            // 暂停按钮（64x64dp 关键按钮）
+            Box(
                 modifier = Modifier
                     .size(64.dp)
+                    .clickable { onPause() }
                     .background(
                         MaterialTheme.colorScheme.surfaceContainerHighest,
                         CircleShape
-                    )
+                    ),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "\u23F8",
-                    style = MaterialTheme.typography.displayLarge,
+                    fontSize = 28.sp,
                     color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-
-            // 设置按钮（省略号）
-            IconButton(
-                onClick = { /* TODO: 打开设置 */ },
-                modifier = Modifier.size(48.dp)
-            ) {
-                Text(
-                    text = "...",
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Light,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -382,6 +400,7 @@ fun PausedScreen(onResume: () -> Unit, onStop: () -> Unit) {
 fun CompletedScreen(
     totalRounds: Int,
     totalDuration: kotlin.time.Duration,
+    isCompleted: Boolean = true,
     onBackToHome: () -> Unit
 ) {
     Column(
@@ -394,14 +413,14 @@ fun CompletedScreen(
     ) {
         // 完成图标
         Text(
-            text = "\uD83C\uDF89",
+            text = if (isCompleted) "\uD83C\uDF89" else "\uD83D\uDE22",
             style = MaterialTheme.typography.displayLarge.copy(fontSize = 80.sp)
         )
 
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "训练完成！",
+            text = if (isCompleted) "训练完成！" else "训练已结束",
             style = MaterialTheme.typography.displayLarge.copy(fontSize = 48.sp),
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.Bold
@@ -533,6 +552,74 @@ fun IdleScreen(
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold
             )
+        }
+    }
+}
+
+/**
+ * 提前结束确认弹窗
+ * 交互设计文档 5.6 节
+ */
+@Composable
+private fun StopConfirmDialog(
+    completedRounds: Int,
+    targetRounds: Int,
+    elapsedDuration: kotlin.time.Duration,
+    onSave: () -> Unit,
+    onDiscard: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            Modifier.fillMaxWidth().padding(16.dp),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            )
+        ) {
+            Column(Modifier.padding(24.dp)) {
+                Text(
+                    "确定结束训练？",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                Text(
+                    "已完成 $completedRounds / $targetRounds 组",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Text(
+                    "运动时长 ${formatTotalTime(elapsedDuration)}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(Modifier.height(24.dp))
+
+                // 保存并结束
+                Button(
+                    onClick = onSave,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("保存并结束")
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // 放弃记录
+                OutlinedButton(
+                    onClick = onDiscard,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("放弃记录", color = MaterialTheme.colorScheme.error)
+                }
+            }
         }
     }
 }

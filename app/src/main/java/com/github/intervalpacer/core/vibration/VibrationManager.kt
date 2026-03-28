@@ -17,6 +17,8 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 class VibrationManager(private val context: Context) {
 
+    var enabled: Boolean = true
+
     private val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
         vibratorManager?.defaultVibrator
@@ -39,7 +41,7 @@ class VibrationManager(private val context: Context) {
      * 震动一次
      */
     fun vibrate(duration: Duration) {
-        if (!hasVibratePermission() || !hasVibrator()) return
+        if (!enabled || !hasVibratePermission() || !hasVibrator()) return
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -62,7 +64,7 @@ class VibrationManager(private val context: Context) {
      * 震动模式
      */
     fun vibratePattern(pattern: VibrationPattern) {
-        if (!hasVibratePermission() || !hasVibrator()) return
+        if (!enabled || !hasVibratePermission() || !hasVibrator()) return
 
         try {
             val timings = pattern.getTimings()
