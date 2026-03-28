@@ -45,16 +45,15 @@ class PhaseManager {
     }
 
     /**
-     * 获取下一个阶段
+     * 获取下一个阶段（基于索引查找）
+     * 注意：Phase 使用 data object 单例，indexOf 在序列中有重复阶段时
+     * 始终返回第一个匹配项，因此必须使用索引查找
      */
-    fun getNextPhase(currentPhase: Phase, config: IntervalConfig): Phase? {
-        if (phaseSequence.isEmpty()) {
-            initializePhases(config)
-        }
-
-        val currentIndex = phaseSequence.indexOf(currentPhase)
-        return if (currentIndex >= 0 && currentIndex < phaseSequence.size - 1) {
-            phaseSequence[currentIndex + 1]
+    fun getNextPhase(currentPhaseIndex: Int): Phase? {
+        if (phaseSequence.isEmpty()) return Phase.Completed
+        val nextIndex = currentPhaseIndex + 1
+        return if (nextIndex < phaseSequence.size) {
+            phaseSequence[nextIndex]
         } else {
             Phase.Completed
         }

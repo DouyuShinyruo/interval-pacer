@@ -2,7 +2,6 @@ package com.github.intervalpacer.domain.model
 
 import kotlin.time.Duration
 import kotlin.time.Instant as KotlinInstant
-import kotlin.time.ExperimentalTime
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -91,7 +90,7 @@ enum class PhaseColor {
 /**
  * 训练会话
  */
-@OptIn(ExperimentalTime::class)
+@OptIn(kotlin.time.ExperimentalTime::class)
 data class WorkoutSession(
     val id: String,
     val type: WorkoutType,

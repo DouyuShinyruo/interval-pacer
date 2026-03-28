@@ -4,12 +4,11 @@ import com.github.intervalpacer.domain.model.IntervalConfig
 import com.github.intervalpacer.domain.model.WorkoutType
 import kotlin.time.Duration
 import kotlin.time.Instant
-import kotlin.time.ExperimentalTime
 
 /**
  * 训练记录实体（用于持久化）
  */
-@OptIn(ExperimentalTime::class)
+@OptIn(kotlin.time.ExperimentalTime::class)
 data class WorkoutRecord(
     val id: String,
     val type: WorkoutType,
@@ -37,7 +36,7 @@ data class WorkoutRecord(
 /**
  * 力量训练配置
  */
-@OptIn(ExperimentalTime::class)
+@OptIn(kotlin.time.ExperimentalTime::class)
 data class StrengthConfig(
     val sets: Int,              // 组数
     val repsPerSet: Int?,       // 每组次数（可选）

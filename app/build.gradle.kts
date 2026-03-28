@@ -1,6 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -47,6 +49,7 @@ dependencies {
     implementation(libs.compose.ui.graphics)
     debugImplementation(libs.compose.ui.tooling)
     implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons.extended)
     implementation(libs.activity.compose)
 
     // ViewModel & Lifecycle
@@ -56,10 +59,10 @@ dependencies {
     // Navigation
     implementation(libs.navigation.compose)
 
-    // Room (暂时注释，MVP 不需要)
-    // implementation(libs.room.runtime)
-    // implementation(libs.room.ktx)
-    // ksp(libs.room.compiler)
+    // Room
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
 
     // Work Manager
     implementation(libs.work.runtime.ktx)
@@ -70,6 +73,9 @@ dependencies {
 
     // Kotlin DateTime
     implementation(libs.kotlinx.datetime)
+
+    // Kotlin Serialization
+    implementation(libs.kotlinx.serialization.json)
 
     // Testing
     testImplementation(libs.junit)

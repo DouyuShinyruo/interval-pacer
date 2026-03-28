@@ -3,8 +3,6 @@ package com.github.intervalpacer.core.tts
 import com.github.intervalpacer.domain.model.Phase
 import com.github.intervalpacer.domain.service.AnnouncementRequest
 import com.github.intervalpacer.domain.service.AnnouncementType
-import kotlin.time.DurationUnit
-import kotlin.time.toDuration
 
 /**
  * 语音提示生成器

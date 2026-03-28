@@ -163,13 +163,13 @@ class TimerService(
         val config = currentConfig ?: return
         val currentPhase = _currentPhase.value
 
-        // 更新完成轮数
-        if (currentPhase is Phase.Run) {
+        // 更新完成轮数（Walk 完成标志一组 Run+Walk 完成）
+        if (currentPhase is Phase.Walk) {
             completedRounds++
         }
 
-        // 获取下一个阶段
-        val nextPhase = phaseManager.getNextPhase(currentPhase, config)
+        // 获取下一个阶段（使用索引查找，避免 data object 的 indexOf 问题）
+        val nextPhase = phaseManager.getNextPhase(currentPhaseIndex)
         if (nextPhase == null || nextPhase is Phase.Completed) {
             // 训练完成
             val totalDuration = calculateTotalDuration()
@@ -210,8 +210,7 @@ class TimerService(
      * 计算总训练时长
      */
     private fun calculateTotalDuration(): Duration {
-        val now = System.currentTimeMillis()
-        return (now - phaseStartTime).milliseconds
+        return currentConfig?.getFullDuration() ?: Duration.ZERO
     }
 
     /**

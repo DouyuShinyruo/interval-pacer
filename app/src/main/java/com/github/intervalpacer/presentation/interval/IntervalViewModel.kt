@@ -3,28 +3,42 @@ package com.github.intervalpacer.presentation.interval
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.intervalpacer.IntervalPacerApp
 import com.github.intervalpacer.core.tts.TTSManager
 import com.github.intervalpacer.core.tts.VoicePromptGenerator
 import com.github.intervalpacer.core.vibration.VibrationManager
+import com.github.intervalpacer.data.model.StrengthConfig
+import com.github.intervalpacer.data.model.WorkoutRecord
 import com.github.intervalpacer.domain.model.IntervalConfig
 import com.github.intervalpacer.domain.model.Phase
 import com.github.intervalpacer.domain.model.WorkoutState
+import com.github.intervalpacer.domain.model.WorkoutType
+import com.github.intervalpacer.domain.repository.HistoryRepository
 import com.github.intervalpacer.domain.service.AnnouncementRequest
 import com.github.intervalpacer.domain.service.TimerService
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
+@OptIn(ExperimentalTime::class)
 class IntervalViewModel(application: Application) : AndroidViewModel(application) {
 
     private val timerService = TimerService(viewModelScope)
     private val ttsManager = TTSManager(application)
     private val vibrationManager = VibrationManager(application)
     private val voicePromptGenerator = VoicePromptGenerator()
+    private val historyRepository: HistoryRepository =
+        (application as IntervalPacerApp).historyRepository
 
     val timerState: StateFlow<WorkoutState> = timerService.timerState
     val currentPhase: StateFlow<Phase> = timerService.currentPhase
+
+    private var trainingStartTime: Long = 0L
+    private var currentIntervalConfig: IntervalConfig? = null
 
     // 默认配置：新手预设
     var config: IntervalConfigUi = IntervalConfigUi(
@@ -42,6 +56,15 @@ class IntervalViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             timerService.announcementFlow.collect { request ->
                 request?.let { handleAnnouncement(it) }
+            }
+        }
+
+        // 监听训练完成，自动保存记录
+        viewModelScope.launch {
+            timerService.timerState.collect { state ->
+                if (state is WorkoutState.Completed) {
+                    saveWorkoutRecord(state)
+                }
             }
         }
     }
@@ -63,6 +86,9 @@ class IntervalViewModel(application: Application) : AndroidViewModel(application
                 enableVibration = true,
                 runFirst = config.runFirst
             )
+
+            currentIntervalConfig = intervalConfig
+            trainingStartTime = System.currentTimeMillis()
 
             timerService.start(intervalConfig)
 
@@ -146,6 +172,33 @@ class IntervalViewModel(application: Application) : AndroidViewModel(application
         timerService.reset()
         ttsManager.stop()
         vibrationManager.cancel()
+    }
+
+    /**
+     * 保存训练记录
+     */
+    private fun saveWorkoutRecord(state: WorkoutState.Completed) {
+        val intervalConfig = currentIntervalConfig ?: return
+        val startTime = if (trainingStartTime > 0L) {
+            Instant.fromEpochMilliseconds(trainingStartTime)
+        } else return
+
+        val record = WorkoutRecord(
+            id = "",
+            type = WorkoutType.INTERVAL_RUN,
+            intervalConfig = intervalConfig,
+            strengthConfig = null,
+            startTime = startTime,
+            endTime = Clock.System.now(),
+            totalDuration = state.totalDuration,
+            completedRounds = state.completedRounds,
+            targetRounds = intervalConfig.repeatCount,
+            isCompleted = state.completedRounds >= intervalConfig.repeatCount
+        )
+
+        viewModelScope.launch {
+            historyRepository.saveRecord(record)
+        }
     }
 
     /**
