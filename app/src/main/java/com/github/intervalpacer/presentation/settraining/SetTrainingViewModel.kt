@@ -8,6 +8,7 @@ import com.github.intervalpacer.core.tts.TTSManager
 import com.github.intervalpacer.core.tts.Urgency
 import com.github.intervalpacer.core.tts.VoicePromptGenerator
 import com.github.intervalpacer.core.vibration.VibrationManager
+import com.github.intervalpacer.data.local.SharedPreferencesManager
 import com.github.intervalpacer.data.model.StrengthConfig
 import com.github.intervalpacer.data.model.WorkoutRecord
 import com.github.intervalpacer.domain.model.SetTrainingConfig
@@ -58,6 +59,7 @@ class SetTrainingViewModel(application: Application) : AndroidViewModel(applicat
 
     private val ttsManager = TTSManager(application)
     private val vibrationManager = VibrationManager(application)
+    private val prefsManager = SharedPreferencesManager(application)
     private val voicePromptGenerator = VoicePromptGenerator()
     private val historyRepository: HistoryRepository =
         (application as IntervalPacerApp).historyRepository
@@ -75,6 +77,12 @@ class SetTrainingViewModel(application: Application) : AndroidViewModel(applicat
     private var restJob: Job? = null
     private var setTimerJob: Job? = null
 
+    val startTime: Long get() = trainingStartTime
+
+    init {
+        vibrationManager.enabled = prefsManager.vibrationEnabled
+    }
+
     /**
      * 开始训练
      */
@@ -83,8 +91,8 @@ class SetTrainingViewModel(application: Application) : AndroidViewModel(applicat
             exerciseName = config.exerciseName,
             totalSets = config.totalSets,
             restDuration = config.restMinutes.minutes + config.restSeconds.seconds,
-            enableVoicePrompt = true,
-            enableVibration = true
+            enableVoicePrompt = prefsManager.voiceEnabled,
+            enableVibration = prefsManager.vibrationEnabled
         )
         currentConfig = config
         completedSets = 0

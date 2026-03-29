@@ -1,6 +1,7 @@
 package com.github.intervalpacer.presentation.settraining
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,6 +42,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.github.intervalpacer.presentation.ui.components.TimeSelectorRow
+import com.github.intervalpacer.presentation.ui.components.WheelTimePickerSheet
+import com.github.intervalpacer.presentation.ui.components.formatPresetTime
+import com.github.intervalpacer.presentation.ui.components.restTimePresets
 
 /**
  * 力量训练主界面
@@ -54,8 +61,14 @@ fun SetTrainingScreen(
     onStop: () -> Unit,
     onCompleteSet: () -> Unit,
     onSkipRest: () -> Unit,
-    onResetToIdle: () -> Unit
+    onResetToIdle: () -> Unit,
+    onDiscard: () -> Unit = {},
+    elapsedDuration: kotlin.time.Duration = kotlin.time.Duration.ZERO,
+    completedSets: Int = 0,
+    targetSets: Int = 5
 ) {
+    var showStopConfirmDialog by remember { mutableStateOf(false) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -80,14 +93,32 @@ fun SetTrainingScreen(
             is SetTrainingState.Paused -> PausedScreen(
                 lastState = trainingState.lastState,
                 onResume = onResume,
-                onStop = onStop
+                onStop = { showStopConfirmDialog = true }
             )
             is SetTrainingState.Completed -> CompletedScreen(
                 totalSets = trainingState.totalSets,
                 totalDuration = trainingState.totalDuration,
+                isCompleted = trainingState.totalSets >= targetSets,
                 onBackToHome = onResetToIdle
             )
         }
+    }
+
+    if (showStopConfirmDialog) {
+        SetStopConfirmDialog(
+            completedSets = completedSets,
+            targetSets = targetSets,
+            elapsedDuration = elapsedDuration,
+            onSaveAndStop = {
+                showStopConfirmDialog = false
+                onStop()
+            },
+            onDiscard = {
+                showStopConfirmDialog = false
+                onDiscard()
+            },
+            onDismiss = { showStopConfirmDialog = false }
+        )
     }
 }
 
@@ -214,17 +245,21 @@ private fun ExercisingScreen(
     ) {
         // 顶部暂停按钮
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp),
+            horizontalArrangement = Arrangement.Start,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(
-                onClick = onPause,
+            Box(
                 modifier = Modifier
                     .size(64.dp)
+                    .clickable { onPause() }
                     .background(
                         MaterialTheme.colorScheme.surfaceContainerHighest,
                         CircleShape
-                    )
+                    ),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "\u23F8",
@@ -476,6 +511,7 @@ private fun PausedScreen(
 private fun CompletedScreen(
     totalSets: Int,
     totalDuration: kotlin.time.Duration,
+    isCompleted: Boolean,
     onBackToHome: () -> Unit
 ) {
     Column(
@@ -487,7 +523,7 @@ private fun CompletedScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "训练完成！",
+            text = if (isCompleted) "训练完成！" else "训练已结束",
             style = MaterialTheme.typography.displayLarge.copy(fontSize = 48.sp),
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.Bold
@@ -574,6 +610,53 @@ private fun CompletedScreen(
 }
 
 /**
+ * 提前结束确认弹窗
+ */
+@Composable
+private fun SetStopConfirmDialog(
+    completedSets: Int,
+    targetSets: Int,
+    elapsedDuration: kotlin.time.Duration,
+    onSaveAndStop: () -> Unit,
+    onDiscard: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "结束训练？",
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    "已完成 $completedSets / $targetSets 组",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "运动时长：${formatDurationText(elapsedDuration)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onSaveAndStop) {
+                Text("保存并结束")
+            }
+        },
+        dismissButton = {
+            androidx.compose.material3.OutlinedButton(onClick = onDiscard) {
+                Text("放弃记录")
+            }
+        }
+    )
+}
+
+/**
  * 配置对话框
  */
 @Composable
@@ -586,6 +669,7 @@ private fun ConfigDialog(
     var totalSets by remember { mutableIntStateOf(config.totalSets) }
     var restMinutes by remember { mutableIntStateOf(config.restMinutes) }
     var restSeconds by remember { mutableIntStateOf(config.restSeconds) }
+    var showRestTimePicker by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -598,6 +682,7 @@ private fun ConfigDialog(
             Column(
                 Modifier
                     .padding(24.dp)
+                    .verticalScroll(rememberScrollState())
                     .navigationBarsPadding()
             ) {
                 Text(
@@ -632,18 +717,12 @@ private fun ConfigDialog(
                 Spacer(Modifier.height(16.dp))
 
                 // 组间休息
-                Row(
-                    Modifier.fillMaxWidth(),
-                    Arrangement.SpaceBetween,
-                    Alignment.CenterVertically
-                ) {
-                    Text("组间休息", style = MaterialTheme.typography.bodyLarge)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CounterPicker(restMinutes, { restMinutes = it }, "分")
-                        Spacer(Modifier.width(8.dp))
-                        CounterPicker(restSeconds, { restSeconds = it }, "秒")
-                    }
-                }
+                TimeSelectorRow(
+                    label = "组间休息",
+                    currentMinutes = restMinutes,
+                    currentSeconds = restSeconds,
+                    onClick = { showRestTimePicker = true }
+                )
 
                 Spacer(Modifier.height(24.dp))
 
@@ -663,6 +742,18 @@ private fun ConfigDialog(
                 }
             }
         }
+    }
+
+    // 组间休息滚轮选择器
+    if (showRestTimePicker) {
+        WheelTimePickerSheet(
+            title = "组间休息",
+            presets = restTimePresets,
+            initialMinutes = restMinutes,
+            initialSeconds = restSeconds,
+            onDismiss = { showRestTimePicker = false },
+            onConfirm = { min, sec -> restMinutes = min; restSeconds = sec; showRestTimePicker = false }
+        )
     }
 }
 

@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -26,6 +28,9 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,6 +50,10 @@ import androidx.compose.ui.window.Dialog
 import com.github.intervalpacer.domain.model.Phase
 import com.github.intervalpacer.domain.model.WorkoutState
 import com.github.intervalpacer.presentation.ui.theme.PhaseColors
+import com.github.intervalpacer.presentation.ui.components.TimeSelectorRow
+import com.github.intervalpacer.presentation.ui.components.WheelTimePickerSheet
+import com.github.intervalpacer.presentation.ui.components.formatPresetTime
+import com.github.intervalpacer.presentation.ui.components.intervalTimePresets
 import kotlin.math.min
 
 /**
@@ -639,6 +648,8 @@ fun ConfigDialog(
     var walkSeconds by remember { mutableIntStateOf(config.walkSeconds) }
     var rounds by remember { mutableIntStateOf(config.rounds) }
     var runFirst by remember { mutableStateOf(config.runFirst) }
+    var showRunTimePicker by remember { mutableStateOf(false) }
+    var showWalkTimePicker by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -648,7 +659,11 @@ fun ConfigDialog(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
             )
         ) {
-            Column(Modifier.padding(24.dp)) {
+            Column(
+                Modifier
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
                 Text(
                     "配置训练参数",
                     style = MaterialTheme.typography.headlineMedium,
@@ -657,36 +672,27 @@ fun ConfigDialog(
 
                 Spacer(Modifier.height(24.dp))
 
-                Row(
-                    Modifier.fillMaxWidth(),
-                    Arrangement.SpaceBetween,
-                    Alignment.CenterVertically
-                ) {
-                    Text(
-                        "跑步时长",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    TimePicker(runMinutes, runSeconds, { runMinutes = it }, { runSeconds = it })
-                }
+                // 跑步时长
+                TimeSelectorRow(
+                    label = "跑步时长",
+                    currentMinutes = runMinutes,
+                    currentSeconds = runSeconds,
+                    onClick = { showRunTimePicker = true }
+                )
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(20.dp))
 
-                Row(
-                    Modifier.fillMaxWidth(),
-                    Arrangement.SpaceBetween,
-                    Alignment.CenterVertically
-                ) {
-                    Text(
-                        "步行时长",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    TimePicker(walkMinutes, walkSeconds, { walkMinutes = it }, { walkSeconds = it })
-                }
+                // 步行时长
+                TimeSelectorRow(
+                    label = "步行时长",
+                    currentMinutes = walkMinutes,
+                    currentSeconds = walkSeconds,
+                    onClick = { showWalkTimePicker = true }
+                )
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(20.dp))
 
+                // 重复组数
                 Row(
                     Modifier.fillMaxWidth(),
                     Arrangement.SpaceBetween,
@@ -702,28 +708,25 @@ fun ConfigDialog(
 
                 Spacer(Modifier.height(16.dp))
 
-                Column {
-                    Text(
-                        "训练顺序",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Row(
-                        Modifier.padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        androidx.compose.material3.RadioButton(runFirst, { runFirst = true })
-                        Spacer(Modifier.width(8.dp))
-                        Text("先跑步")
-                    }
-                    Row(
-                        Modifier.padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        androidx.compose.material3.RadioButton(!runFirst, { runFirst = false })
-                        Spacer(Modifier.width(8.dp))
-                        Text("先步行")
+                // 训练顺序
+                Text(
+                    "训练顺序",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                val orderOptions = listOf("先跑步", "先步行")
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    orderOptions.forEachIndexed { index, label ->
+                        SegmentedButton(
+                            selected = (index == 0) == runFirst,
+                            onClick = { runFirst = (index == 0) },
+                            shape = SegmentedButtonDefaults.itemShape(index, orderOptions.size)
+                        ) {
+                            Text(label)
+                        }
                     }
                 }
 
@@ -755,22 +758,29 @@ fun ConfigDialog(
             }
         }
     }
-}
 
-/**
- * 时间选择器
- */
-@Composable
-private fun TimePicker(
-    minutes: Int,
-    seconds: Int,
-    onMinutesChange: (Int) -> Unit,
-    onSecondsChange: (Int) -> Unit
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        CounterPicker(minutes, onMinutesChange, "分")
-        Spacer(Modifier.width(8.dp))
-        CounterPicker(seconds, onSecondsChange, "秒")
+    // 跑步时长滚轮选择器
+    if (showRunTimePicker) {
+        WheelTimePickerSheet(
+            title = "跑步时长",
+            presets = intervalTimePresets,
+            initialMinutes = runMinutes,
+            initialSeconds = runSeconds,
+            onDismiss = { showRunTimePicker = false },
+            onConfirm = { min, sec -> runMinutes = min; runSeconds = sec; showRunTimePicker = false }
+        )
+    }
+
+    // 步行时长滚轮选择器
+    if (showWalkTimePicker) {
+        WheelTimePickerSheet(
+            title = "步行时长",
+            presets = intervalTimePresets,
+            initialMinutes = walkMinutes,
+            initialSeconds = walkSeconds,
+            onDismiss = { showWalkTimePicker = false },
+            onConfirm = { min, sec -> walkMinutes = min; walkSeconds = sec; showWalkTimePicker = false }
+        )
     }
 }
 

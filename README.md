@@ -4,58 +4,78 @@
 
 Interval Pacer 是一款为跑者和健身爱好者设计的计时工具，专注于"提醒"而非"记录"。通过语音和震动提示，让你在运动时无需看手机，专注训练本身。
 
-## ✨ 核心功能
+## 功能概览
 
-### 🏃 走跑间歇训练
-- 自定义跑步/步行时长
-- 先跑或先走的顺序选择
+### 走跑间歇训练
+- 自定义跑步/步行时长，循环滚轮精确到秒
+- 快捷预设（30s / 45s / 1:00 / 1:30 / 2:00 / 5:00）
 - 语音播报阶段转换（"跑步"、"步行"）
 - 震动提醒（户外嘈杂时的补充）
-- 大字体倒计时显示
-- 暂停/恢复/跳过阶段
+- 大字体倒计时 + 整体进度条
+- 暂停 / 恢复 / 跳过阶段 / 停止训练
+- 前台服务保证锁屏时持续运行
 
-### 💪 力量训练计时（计划中）
-- 组数设置
-- 组间休息倒计时
-- 组完成语音提示
+### 健身组数计时
+- 自定义动作名称、目标组数、组间休息时间
+- 组间休息循环滚轮选择器（30s / 45s / 1:00 / 1:30 / 2:00 / 3:00）
+- 手动确认完成每组 → 自动开始组间倒计时
+- 语音播报组完成与休息倒计时
 
-## 🛠️ 技术栈
+### 训练历史
+- 自动保存每次训练记录到本地数据库
+- 按日期浏览历史，查看训练详情（类型、时长、参数）
 
-- **语言**: Kotlin
-- **UI 框架**: Jetpack Compose
-- **架构**: MVVM + Clean Architecture
-- **异步**: Kotlin Coroutines + Flow
-- **语音**: Android TTS (Text-to-Speech)
-- **最低版本**: Android 7.0 (API 24)
+### 设置
+- TTS 语音引擎选择、语速/音调调节
+- 震动开关
+- 配置记忆（下次打开保留上次设置）
 
-## 🚧 开发状态
+## 技术栈
 
-**当前版本**: MVP (Minimum Viable Product)
+| 层面 | 技术选型 |
+|------|---------|
+| 语言 | Kotlin |
+| UI | Jetpack Compose (Material 3) |
+| 架构 | MVVM + Clean Architecture |
+| 异步 | Kotlin Coroutines + Flow |
+| 本地存储 | Room Database + SharedPreferences |
+| 后台服务 | Foreground Service + WorkManager |
+| 语音 | Android TTS (Text-to-Speech) |
+| 最低版本 | Android 8.0 (API 26) |
 
-### ✅ 已完成
-- 走跑间歇训练核心功能
-- 语音播报 + 震动提醒
-- 训练参数配置（时长、组数、顺序）
-- 训练中控制（暂停/恢复/跳过/停止）
-- 完成总结页面
+## 项目结构
 
-### 🔄 开发中
-- 历史记录保存
-- 训练统计页面
-- 更多语音选项
+```
+app/src/main/java/com/github/intervalpacer/
+├── core/              # 核心基础设施
+│   ├── tts/           # TTS 语音管理
+│   ├── audio/         # 音频焦点管理
+│   ├── vibration/     # 震动管理
+│   └── notification/  # 通知控制器
+├── data/              # 数据层
+│   ├── local/         # Room 数据库、SharedPreferences
+│   └── repository/    # Repository 实现
+├── domain/            # 领域层
+│   ├── model/         # 领域模型
+│   ├── repository/    # Repository 接口
+│   └── service/       # 业务服务（Timer、PhaseManager）
+├── presentation/      # 表现层
+│   ├── home/          # 首页
+│   ├── interval/      # 间歇训练
+│   ├── settraining/   # 健身计时
+│   ├── history/       # 历史记录
+│   ├── settings/      # 设置
+│   ├── navigation/    # 导航
+│   └── ui/            # 主题、组件、Activity
+└── service/           # 前台服务
+```
 
-### 📋 计划中
-- 力量训练模式
-- 音乐集成
-- 手套模式（音量键控制）
-- 可穿戴设备支持
-
-## 🏃 快速开始
+## 快速开始
 
 ### 环境要求
-- Android Studio Hedgehog | 2023.1.1 或更高
+- Android Studio 2023.1.1 或更高
 - JDK 17
-- Android SDK API 24+
+- Android SDK API 26+
 
 ### 构建项目
 ```bash
@@ -70,11 +90,24 @@ cd IntervalPacer
 adb shell am start -n com.github.intervalpacer/.MainActivity
 ```
 
-## 📸 截图
+## 路线图
 
-> 截图将在 v1.0 发布时添加
+### v1.0 — 当前版本
+- [x] 走跑间歇训练（语音 + 震动 + 前台服务）
+- [x] 健身组数计时（手动确认 + 自动休息倒计时）
+- [x] 训练历史记录（本地数据库）
+- [x] 循环滚轮时间选择器（预设 + 自由调节）
+- [x] TTS 设置（引擎、语速、音调）
+- [x] 配置记忆
+- [x] Material 3 设计语言
 
-## 🎯 设计理念
+### 计划中
+- [ ] 手套模式（音量键控制）
+- [ ] 音乐集成（训练时自动暂停/恢复音乐）
+- [ ] 可穿戴设备支持（Wear OS）
+- [ ] 训练统计与趋势图表
+
+## 设计理念
 
 基于 **Don Norman** 的人本设计原则和 **Alan Cooper** 的目标导向设计：
 
@@ -85,19 +118,6 @@ adb shell am start -n com.github.intervalpacer/.MainActivity
 
 详细设计文档请查看 [docs/](docs/) 目录。
 
-## 🤝 贡献
-
-目前项目处于 MVP 阶段，专注于核心功能开发。欢迎提交 Issue 报告 Bug 或提出建议。
-
-## 📄 许可证
+## 许可证
 
 MIT License - 详见 [LICENSE](LICENSE) 文件
-
-## 📮 联系方式
-
-- 项目主页: [GitHub](https://github.com/shinyruo/IntervalPacer)
-- 问题反馈: [Issues](https://github.com/shinyruo/IntervalPacer/issues)
-
----
-
-**Note**: 本项目正在积极开发中，API 和功能可能会有变动。

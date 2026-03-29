@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,13 +15,16 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -28,9 +32,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -40,10 +47,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import com.github.intervalpacer.presentation.interval.IntervalConfigUi
 import com.github.intervalpacer.presentation.interval.ConfigDialog
+import com.github.intervalpacer.presentation.settraining.SetTrainingConfigUi
+import com.github.intervalpacer.presentation.ui.components.TimeSelectorRow
+import com.github.intervalpacer.presentation.ui.components.WheelTimePickerSheet
+import com.github.intervalpacer.presentation.ui.components.formatPresetTime
+import com.github.intervalpacer.presentation.ui.components.restTimePresets
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 /**
  * 主界面（Home）
@@ -51,24 +69,23 @@ import com.github.intervalpacer.presentation.interval.ConfigDialog
  */
 @Composable
 fun HomeScreen(
+    intervalConfig: IntervalConfigUi,
+    strengthConfig: SetTrainingConfigUi,
+    onIntervalConfigChange: (IntervalConfigUi) -> Unit,
+    onStrengthConfigChange: (SetTrainingConfigUi) -> Unit,
+    initialMode: String = "interval",
+    lastUsedTime: Long = 0L,
     onNavigateToInterval: () -> Unit = {},
     onNavigateToSetTraining: () -> Unit = {},
     onNavigateToHistory: () -> Unit = {}
 ) {
-    var selectedMode by remember { mutableStateOf(TrainingMode.INTERVAL) }
-    var intervalConfig by remember {
+    var selectedMode by remember {
         mutableStateOf(
-            IntervalConfigUi(
-                runMinutes = 1,
-                runSeconds = 0,
-                walkMinutes = 2,
-                walkSeconds = 0,
-                rounds = 5,
-                runFirst = true
-            )
+            if (initialMode == "strength") TrainingMode.STRENGTH else TrainingMode.INTERVAL
         )
     }
-    var showConfigDialog by remember { mutableStateOf(false) }
+    var showIntervalConfigDialog by remember { mutableStateOf(false) }
+    var showStrengthConfigDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -90,11 +107,21 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        Text(
-            text = "运动时机控制专家",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        // 上次使用时间
+        val lastUsedText = formatLastUsedTime(lastUsedTime)
+        if (lastUsedText.isNotEmpty()) {
+            Text(
+                text = "上次：$lastUsedText",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            Text(
+                text = "运动时机控制专家",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
 
         Spacer(modifier = Modifier.height(40.dp))
 
@@ -135,11 +162,14 @@ fun HomeScreen(
             TrainingMode.INTERVAL -> {
                 ConfigDisplayCard(
                     config = intervalConfig,
-                    onEditClick = { showConfigDialog = true }
+                    onEditClick = { showIntervalConfigDialog = true }
                 )
             }
             TrainingMode.STRENGTH -> {
-                StrengthConfigDisplayCard()
+                StrengthConfigDisplayCard(
+                    config = strengthConfig,
+                    onEditClick = { showStrengthConfigDialog = true }
+                )
             }
         }
 
@@ -162,7 +192,7 @@ fun HomeScreen(
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.List,
+                    imageVector = Icons.AutoMirrored.Filled.List,
                     contentDescription = null,
                     modifier = Modifier.size(20.dp)
                 )
@@ -205,14 +235,26 @@ fun HomeScreen(
         Spacer(modifier = Modifier.height(16.dp))
     }
 
-    // 配置对话框
-    if (showConfigDialog) {
+    // 间歇训练配置对话框
+    if (showIntervalConfigDialog) {
         ConfigDialog(
             config = intervalConfig,
-            onDismiss = { showConfigDialog = false },
+            onDismiss = { showIntervalConfigDialog = false },
             onConfirm = { newConfig ->
-                intervalConfig = newConfig
-                showConfigDialog = false
+                onIntervalConfigChange(newConfig)
+                showIntervalConfigDialog = false
+            }
+        )
+    }
+
+    // 力量训练配置对话框
+    if (showStrengthConfigDialog) {
+        StrengthConfigDialog(
+            config = strengthConfig,
+            onDismiss = { showStrengthConfigDialog = false },
+            onConfirm = { newConfig ->
+                onStrengthConfigChange(newConfig)
+                showStrengthConfigDialog = false
             }
         )
     }
@@ -387,10 +429,13 @@ private fun ConfigDisplayCard(
 }
 
 /**
- * 力量训练配置占位卡片
+ * 力量训练配置显示卡片
  */
 @Composable
-private fun StrengthConfigDisplayCard() {
+private fun StrengthConfigDisplayCard(
+    config: SetTrainingConfigUi,
+    onEditClick: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -401,33 +446,207 @@ private fun StrengthConfigDisplayCard() {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(20.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.Favorite,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(40.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "当前配置",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = config.getSummary(),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                // 编辑按钮
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(
+                            MaterialTheme.colorScheme.surfaceContainerHigh,
+                            CircleShape
+                        )
+                        .clip(CircleShape)
+                        .clickable(onClick = onEditClick),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "编辑",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 配置详情
+            if (config.exerciseName.isNotEmpty()) {
+                ConfigDetailRow("动作名称", config.exerciseName)
+            }
+            ConfigDetailRow("总组数", "${config.totalSets} 组")
+            ConfigDetailRow("组间休息", config.getRestDescription())
+        }
+    }
+}
+
+/**
+ * 力量训练配置对话框
+ */
+@Composable
+private fun StrengthConfigDialog(
+    config: SetTrainingConfigUi,
+    onDismiss: () -> Unit,
+    onConfirm: (SetTrainingConfigUi) -> Unit
+) {
+    var exerciseName by remember { mutableStateOf(config.exerciseName) }
+    var totalSets by remember { mutableIntStateOf(config.totalSets) }
+    var restMinutes by remember { mutableIntStateOf(config.restMinutes) }
+    var restSeconds by remember { mutableIntStateOf(config.restSeconds) }
+    var showRestTimePicker by remember { mutableStateOf(false) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            Modifier.fillMaxWidth().padding(16.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
             )
+        ) {
+            Column(
+                Modifier
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState())
+                    .navigationBarsPadding()
+            ) {
+                Text(
+                    "配置力量训练",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
+                )
 
-            Spacer(modifier = Modifier.height(12.dp))
+                Spacer(Modifier.height(24.dp))
 
+                // 动作名称
+                OutlinedTextField(
+                    value = exerciseName,
+                    onValueChange = { exerciseName = it },
+                    label = { Text("动作名称（可选）") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                // 组数
+                Row(
+                    Modifier.fillMaxWidth(),
+                    Arrangement.SpaceBetween,
+                    Alignment.CenterVertically
+                ) {
+                    Text("总组数", style = MaterialTheme.typography.bodyLarge)
+                    HomeCounterPicker(totalSets, { totalSets = it }, "组")
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                // 组间休息
+                TimeSelectorRow(
+                    label = "组间休息",
+                    currentMinutes = restMinutes,
+                    currentSeconds = restSeconds,
+                    onClick = { showRestTimePicker = true }
+                )
+
+                Spacer(Modifier.height(24.dp))
+
+                Row(Modifier.fillMaxWidth(), Arrangement.End) {
+                    OutlinedButton(
+                        onClick = onDismiss
+                    ) { Text("取消") }
+
+                    Spacer(Modifier.width(8.dp))
+
+                    Button(onClick = {
+                        onConfirm(SetTrainingConfigUi(exerciseName, totalSets, restMinutes, restSeconds))
+                    }) { Text("确定") }
+                }
+            }
+        }
+    }
+
+    // 组间休息滚轮选择器
+    if (showRestTimePicker) {
+        WheelTimePickerSheet(
+            title = "组间休息",
+            presets = restTimePresets,
+            initialMinutes = restMinutes,
+            initialSeconds = restSeconds,
+            onDismiss = { showRestTimePicker = false },
+            onConfirm = { min, sec -> restMinutes = min; restSeconds = sec; showRestTimePicker = false }
+        )
+    }
+}
+@Composable
+private fun HomeCounterPicker(
+    value: Int,
+    onChange: (Int) -> Unit,
+    label: String
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Button(
+            { if (value > 0) onChange(value - 1) },
+            Modifier.size(48.dp),
+            shape = CircleShape,
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            Text("-", style = MaterialTheme.typography.titleLarge)
+        }
+
+        Spacer(Modifier.width(12.dp))
+
+        Box(
+            Modifier.size(64.dp, 48.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.Center
+        ) {
             Text(
-                text = "力量训练模式",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = "即将推出，敬请期待",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                "$value",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
             )
         }
+
+        Spacer(Modifier.width(12.dp))
+
+        Button(
+            { onChange(value + 1) },
+            Modifier.size(48.dp),
+            shape = CircleShape,
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            Text("+", style = MaterialTheme.typography.titleLarge)
+        }
+
+        Text(
+            label,
+            Modifier.padding(start = 8.dp),
+            style = MaterialTheme.typography.bodyMedium
+        )
     }
 }
 
@@ -459,6 +678,21 @@ private fun formatDuration(minutes: Int, seconds: Int): String {
         minutes > 0 -> "${minutes}分钟"
         seconds > 0 -> "${seconds}秒"
         else -> "0秒"
+    }
+}
+
+private fun formatLastUsedTime(timestamp: Long): String {
+    if (timestamp <= 0) return ""
+    val now = System.currentTimeMillis()
+    val diffMs = now - timestamp
+    val diffDays = TimeUnit.MILLISECONDS.toDays(diffMs)
+    val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+    val timeStr = timeFormat.format(Date(timestamp))
+    return when {
+        diffDays == 0L -> "今天 $timeStr"
+        diffDays == 1L -> "昨天 $timeStr"
+        diffDays == 2L -> "两天前"
+        else -> "${diffDays}天前"
     }
 }
 

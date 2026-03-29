@@ -2,6 +2,8 @@ package com.github.intervalpacer.data.local
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.github.intervalpacer.presentation.interval.IntervalConfigUi
+import com.github.intervalpacer.presentation.settraining.SetTrainingConfigUi
 
 /**
  * 设置选项枚举
@@ -52,6 +54,24 @@ class SharedPreferencesManager(context: Context) {
         // 交互设置 Key
         private const val KEY_VIBRATION_ENABLED = "vibration_enabled"
         private const val KEY_LOCK_SCREEN_NOTIFICATION = "lock_screen_notification"
+
+        // 训练配置持久化 Key
+        private const val KEY_LAST_TRAINING_MODE = "last_training_mode"
+        private const val KEY_LAST_USED_TIME = "last_used_time"
+
+        // 间歇训练配置 Key
+        private const val KEY_INTERVAL_RUN_MINUTES = "interval_run_minutes"
+        private const val KEY_INTERVAL_RUN_SECONDS = "interval_run_seconds"
+        private const val KEY_INTERVAL_WALK_MINUTES = "interval_walk_minutes"
+        private const val KEY_INTERVAL_WALK_SECONDS = "interval_walk_seconds"
+        private const val KEY_INTERVAL_ROUNDS = "interval_rounds"
+        private const val KEY_INTERVAL_RUN_FIRST = "interval_run_first"
+
+        // 力量训练配置 Key
+        private const val KEY_STRENGTH_EXERCISE_NAME = "strength_exercise_name"
+        private const val KEY_STRENGTH_TOTAL_SETS = "strength_total_sets"
+        private const val KEY_STRENGTH_REST_MINUTES = "strength_rest_minutes"
+        private const val KEY_STRENGTH_REST_SECONDS = "strength_rest_seconds"
 
         // 默认值
         private const val DEFAULT_VOICE_ENABLED = true
@@ -159,6 +179,60 @@ class SharedPreferencesManager(context: Context) {
 
     fun saveLockScreenNotification(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_LOCK_SCREEN_NOTIFICATION, enabled).apply()
+    }
+
+    // ========== 训练配置持久化 ==========
+
+    val lastTrainingMode: String
+        get() = prefs.getString(KEY_LAST_TRAINING_MODE, "interval") ?: "interval"
+
+    fun saveLastTrainingMode(mode: String) {
+        prefs.edit().putString(KEY_LAST_TRAINING_MODE, mode).apply()
+    }
+
+    val lastUsedTime: Long
+        get() = prefs.getLong(KEY_LAST_USED_TIME, 0L)
+
+    fun saveLastUsedTime(time: Long) {
+        prefs.edit().putLong(KEY_LAST_USED_TIME, time).apply()
+    }
+
+    val intervalConfig: IntervalConfigUi
+        get() = IntervalConfigUi(
+            runMinutes = prefs.getInt(KEY_INTERVAL_RUN_MINUTES, 1),
+            runSeconds = prefs.getInt(KEY_INTERVAL_RUN_SECONDS, 0),
+            walkMinutes = prefs.getInt(KEY_INTERVAL_WALK_MINUTES, 2),
+            walkSeconds = prefs.getInt(KEY_INTERVAL_WALK_SECONDS, 0),
+            rounds = prefs.getInt(KEY_INTERVAL_ROUNDS, 5),
+            runFirst = prefs.getBoolean(KEY_INTERVAL_RUN_FIRST, true)
+        )
+
+    fun saveIntervalConfig(config: IntervalConfigUi) {
+        prefs.edit()
+            .putInt(KEY_INTERVAL_RUN_MINUTES, config.runMinutes)
+            .putInt(KEY_INTERVAL_RUN_SECONDS, config.runSeconds)
+            .putInt(KEY_INTERVAL_WALK_MINUTES, config.walkMinutes)
+            .putInt(KEY_INTERVAL_WALK_SECONDS, config.walkSeconds)
+            .putInt(KEY_INTERVAL_ROUNDS, config.rounds)
+            .putBoolean(KEY_INTERVAL_RUN_FIRST, config.runFirst)
+            .apply()
+    }
+
+    val strengthConfig: SetTrainingConfigUi
+        get() = SetTrainingConfigUi(
+            exerciseName = prefs.getString(KEY_STRENGTH_EXERCISE_NAME, "") ?: "",
+            totalSets = prefs.getInt(KEY_STRENGTH_TOTAL_SETS, 5),
+            restMinutes = prefs.getInt(KEY_STRENGTH_REST_MINUTES, 1),
+            restSeconds = prefs.getInt(KEY_STRENGTH_REST_SECONDS, 30)
+        )
+
+    fun saveStrengthConfig(config: SetTrainingConfigUi) {
+        prefs.edit()
+            .putString(KEY_STRENGTH_EXERCISE_NAME, config.exerciseName)
+            .putInt(KEY_STRENGTH_TOTAL_SETS, config.totalSets)
+            .putInt(KEY_STRENGTH_REST_MINUTES, config.restMinutes)
+            .putInt(KEY_STRENGTH_REST_SECONDS, config.restSeconds)
+            .apply()
     }
 
     /**

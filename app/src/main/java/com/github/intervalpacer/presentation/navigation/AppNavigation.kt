@@ -9,6 +9,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,6 +28,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.github.intervalpacer.domain.model.WorkoutState
 import kotlin.time.Duration.Companion.milliseconds
+import com.github.intervalpacer.data.local.SharedPreferencesManager
 import com.github.intervalpacer.presentation.home.HomeScreen
 import com.github.intervalpacer.presentation.history.HistoryDetailScreen
 import com.github.intervalpacer.presentation.history.HistoryScreen
@@ -35,6 +37,7 @@ import com.github.intervalpacer.presentation.interval.IntervalConfigUi
 import com.github.intervalpacer.presentation.interval.IntervalScreen
 import com.github.intervalpacer.presentation.interval.IntervalViewModel
 import com.github.intervalpacer.presentation.settraining.SetTrainingScreen
+import com.github.intervalpacer.presentation.settraining.SetTrainingState
 import com.github.intervalpacer.presentation.settraining.SetTrainingViewModel
 import com.github.intervalpacer.presentation.settings.SettingsScreen
 import com.github.intervalpacer.presentation.settings.SettingsViewModel
@@ -73,7 +76,8 @@ fun AppNavigation(
     intervalViewModel: IntervalViewModel,
     setTrainingViewModel: SetTrainingViewModel,
     historyViewModel: HistoryViewModel,
-    settingsViewModel: SettingsViewModel
+    settingsViewModel: SettingsViewModel,
+    prefsManager: SharedPreferencesManager
 ) {
     val navController = rememberNavController()
     val bottomNavScreens = listOf(Screen.Home, Screen.History, Screen.Settings)
@@ -128,10 +132,22 @@ fun AppNavigation(
             // 首页
             composable(Screen.Home.route) {
                 HomeScreen(
+                    intervalConfig = intervalViewModel.config,
+                    strengthConfig = setTrainingViewModel.config,
+                    onIntervalConfigChange = { intervalViewModel.updateConfig(it) },
+                    onStrengthConfigChange = { setTrainingViewModel.updateConfig(it) },
+                    initialMode = prefsManager.lastTrainingMode,
+                    lastUsedTime = prefsManager.lastUsedTime,
                     onNavigateToInterval = {
+                        prefsManager.saveLastTrainingMode("interval")
+                        prefsManager.saveLastUsedTime(System.currentTimeMillis())
+                        prefsManager.saveIntervalConfig(intervalViewModel.config)
                         navController.navigate(Screen.Interval.route)
                     },
                     onNavigateToSetTraining = {
+                        prefsManager.saveLastTrainingMode("strength")
+                        prefsManager.saveLastUsedTime(System.currentTimeMillis())
+                        prefsManager.saveStrengthConfig(setTrainingViewModel.config)
                         navController.navigate(Screen.SetTraining.route)
                     },
                     onNavigateToHistory = {
@@ -202,6 +218,11 @@ fun AppNavigation(
                 val trainingState by setTrainingViewModel.trainingState.collectAsState()
                 var config by remember { mutableStateOf(setTrainingViewModel.config) }
 
+                // 导航离开时重置状态，避免返回主页时闪过 IdleScreen
+                DisposableEffect(Unit) {
+                    onDispose { setTrainingViewModel.resetToIdle() }
+                }
+
                 SetTrainingScreen(
                     trainingState = trainingState,
                     config = config,
@@ -219,8 +240,17 @@ fun AppNavigation(
                     onSkipRest = { setTrainingViewModel.skipRest() },
                     onResetToIdle = {
                         navController.popBackStack(Screen.Home.route, inclusive = false)
-                        setTrainingViewModel.resetToIdle()
-                    }
+                    },
+                    onDiscard = {
+                        navController.popBackStack(Screen.Home.route, inclusive = false)
+                    },
+                    elapsedDuration = if (setTrainingViewModel.startTime > 0L) {
+                        (System.currentTimeMillis() - setTrainingViewModel.startTime).milliseconds
+                    } else {
+                        kotlin.time.Duration.ZERO
+                    },
+                    completedSets = (trainingState as? SetTrainingState.Exercising)?.completedSets ?: 0,
+                    targetSets = config.totalSets
                 )
             }
 

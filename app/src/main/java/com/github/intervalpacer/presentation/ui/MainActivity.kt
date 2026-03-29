@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.github.intervalpacer.data.local.DarkModeOption
+import com.github.intervalpacer.data.local.SharedPreferencesManager
 import com.github.intervalpacer.presentation.navigation.AppNavigation
 import com.github.intervalpacer.presentation.history.HistoryViewModel
 import com.github.intervalpacer.presentation.interval.IntervalViewModel
@@ -76,7 +77,8 @@ class MainActivity : ComponentActivity() {
                         intervalViewModel = intervalViewModel,
                         setTrainingViewModel = setTrainingViewModel,
                         historyViewModel = historyViewModel,
-                        settingsViewModel = settingsViewModel
+                        settingsViewModel = settingsViewModel,
+                        prefsManager = SharedPreferencesManager(this)
                     )
                 }
             }

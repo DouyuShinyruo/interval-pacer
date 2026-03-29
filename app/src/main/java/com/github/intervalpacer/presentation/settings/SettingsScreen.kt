@@ -13,7 +13,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RadioButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SwitchDefaults
@@ -210,19 +212,17 @@ private fun <T> SettingsRadioItem(
             text = title,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(bottom = 4.dp)
+            modifier = Modifier.padding(bottom = 8.dp)
         )
-        options.forEach { (value, label) ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            options.forEachIndexed { index, (value, label) ->
+                SegmentedButton(
                     selected = (value == selectedOption),
-                    onClick = { onSelect(value) }
-                )
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                    onClick = { onSelect(value) },
+                    shape = SegmentedButtonDefaults.itemShape(index, options.size)
+                ) {
+                    Text(label, style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
     }
