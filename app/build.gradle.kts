@@ -8,12 +8,15 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
-// 读取 local.properties 中的签名配置
+// 读取 local.properties 中的签名配置，回退到环境变量（CI 用）
 val localProperties = Properties()
 val localPropsFile = rootProject.file("local.properties")
 if (localPropsFile.exists()) {
     localProperties.load(FileInputStream(localPropsFile))
 }
+
+fun signingProp(propName: String, envName: String): String =
+    localProperties.getProperty(propName) ?: System.getenv(envName) ?: ""
 
 android {
     namespace = "com.github.intervalpacer"
@@ -32,9 +35,9 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file(localProperties.getProperty("RELEASE_STORE_FILE", "release.jks"))
-            storePassword = localProperties.getProperty("RELEASE_STORE_PASSWORD", "")
-            keyAlias = localProperties.getProperty("RELEASE_KEY_ALIAS", "")
-            keyPassword = localProperties.getProperty("RELEASE_KEY_PASSWORD", "")
+            storePassword = signingProp("RELEASE_STORE_PASSWORD", "RELEASE_STORE_PASSWORD")
+            keyAlias = signingProp("RELEASE_KEY_ALIAS", "RELEASE_KEY_ALIAS")
+            keyPassword = signingProp("RELEASE_KEY_PASSWORD", "RELEASE_KEY_PASSWORD")
         }
     }
 
